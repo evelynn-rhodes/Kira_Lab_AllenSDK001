@@ -51,13 +51,20 @@ function visual_pop_sim
     fprintf('R size: %d x %d (N x #stim)\n', size(R,1), size(R,2));
 
     figure;
-    imagesc(R)
+    set(gcf,'OuterPosition',[700 350 700 700])
+    imagesc(R);
+    xlabel('Stimulus orientation (deg)');
+    ylabel('Neuron index');
+    title('Population responses','FontSize',20);
+    colormap(parula);
+    colorbar;
     
     % Example visualization: a few neurons’ tuning across the 6 orientations
     figure('Color','w'); hold on
+    set(gcf,'OuterPosition',[700 350 700 700])
     plot(stim_oris, R(1:5,:)', '-o', 'LineWidth', 1.2);
     xlabel('Orientation (deg)'); ylabel('Response');
-    title('Example simulated tuning (first 5 neurons)');
+    title('Example simulated tuning (first 5 neurons)','FontSize',20);
     grid on
 
         % --- PCA on population responses across stimuli ---
@@ -78,6 +85,8 @@ function visual_pop_sim
 
 
     figure('Color','w'); hold on
+    set(gcf,'OuterPosition',[700 350 700 700])
+
 
     % Connect points (in stimulus order) with black line
     plot3(score(:,1), score(:,2), score(:,3), '-k', 'LineWidth', 1.2);
@@ -107,18 +116,49 @@ function visual_pop_sim
     % Show explained variance in title
     explVar = 100 * latent / sum(latent);
     title(sprintf('Population PCA (%.1f%% / %.1f%% / %.1f%%)', ...
-        explVar(1), explVar(2), explVar(3)));
+        explVar(1), explVar(2), explVar(3)),'FontSize',20);
 
     colormap(cmap);
     c = colorbar;
-    c.Ticks = linspace(0,1,numel(stim_oris));
-    c.TickLabels = string(stim_oris);
-    c.Label.String = 'Orientation (deg)';
-    c.Label.FontSize = 12;
 
+    % Define which orientations to show
+    tick_oris = 0:30:180;
+
+    % Normalize tick positions to the range [0, 1]
+    tick_positions = tick_oris / max(stim_oris);
+
+    % Apply ticks and labels
+    c.Ticks = tick_positions;
+    c.TickLabels = string(tick_oris);
+
+    % Label for the colorbar
+    c.Label.String = 'Orientation (deg)';
+    % c.Label.FontSize = 12;
+
+    
     grid on;
     axis equal;
     view(3);
+    add_margin(score);
 
 
+end
+
+function add_margin(score)
+    % Compute axis limits with 10% margins
+    margin_ratio = 0.10;
+
+    % Get data ranges
+    x_min = min(score(:,1)); x_max = max(score(:,1));
+    y_min = min(score(:,2)); y_max = max(score(:,2));
+    z_min = min(score(:,3)); z_max = max(score(:,3));
+
+    % Expand each limit by 10% of its range
+    x_range = x_max - x_min;
+    y_range = y_max - y_min;
+    z_range = z_max - z_min;
+
+    xlim([x_min - margin_ratio*x_range, x_max + margin_ratio*x_range]);
+    ylim([y_min - margin_ratio*y_range, y_max + margin_ratio*y_range]);
+    zlim([z_min - margin_ratio*z_range, z_max + margin_ratio*z_range]);
 end
