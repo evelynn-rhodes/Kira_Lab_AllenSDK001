@@ -480,4 +480,5 @@ sgtitle("2-D PCA — Spatial Frequency Sweeps Across Orientations (Activity-weig
     "FontWeight","bold");
 
 fprintf('✅ PCA visualization with variance + activity weighting complete.\n');
+
  
