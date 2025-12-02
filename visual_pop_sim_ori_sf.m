@@ -9,7 +9,7 @@ function visual_pop_sim_ori_sf
 
     % Stimulus dimensions
     stim_oris = 0:10:180;                         % orientations (deg)
-    stim_sfs  = logspace(-2, 1, 10);              % spatial freq (cycles/deg), 0.01 to 10
+    stim_sfs  = logspace(-3, 2, 15);              % spatial freq (cycles/deg), 0.001 to 100
 
     baseline  = 0.1;                              % baseline dF/F (or spikes/s)
     gain      = 1.0;                              % response gain
@@ -172,17 +172,54 @@ function visual_pop_sim_ori_sf
 
     [coeff, score, latent] = pca(X);
 
-    %% Cyclic colormap for orientations (ignoring SF in color)
+    %% Cumulative explained variance plot
+    % Explained variance per PC (in percent)
+    explVar = 100 * latent / sum(latent);
+
+    % Cumulative explained variance
+    cumExplVar = cumsum(explVar);
+
+    % Plot cumulative explained variance
+    figure('Color','w');
+    set(gcf,'OuterPosition',[300 300 600 500]);
+    subplot(2,1,1)
+    numPCs = numel(explVar);
+    plot(1:numPCs, cumExplVar, '-o', 'LineWidth', 1.5);
+    xlabel('Number of principal components');
+    ylabel('Cumulative explained variance (%)');
+    title('Cumulative variance explained by PCs', 'FontSize', 16);
+    grid on;
+
+    subplot(2,1,2)
+    plot(1:numPCs, explVar, '-o', 'LineWidth', 1.5);
+
+    %% Color coding: orientation = hue, spatial frequency = brightness
+
+    % Base hues for each orientation (for colorbar)
     nOri_color = numel(stim_oris);
     angles = linspace(0, 2*pi, nOri_color+1);
-    angles(end) = [];                 % drop duplicate
-    hsv_colors = hsv2rgb([angles'/(2*pi), ones(nOri_color,1), ones(nOri_color,1)]);
-    cmap = hsv_colors;
+    angles(end) = [];                                 % drop duplicate
+    hues = angles'/(2*pi);                            % nOri_color × 1
 
-    % For each condition, map its orientation to a color index
+    % For each condition, map its orientation to an index
     [~, ori_idx_for_cond] = ismember(stim_ori_list, stim_oris);
 
-    %% Visualization 4: Top 3 PCs, color coded by orientation
+    % Normalize spatial frequency to brightness (value in HSV)
+    sf_min = min(stim_sf_list);
+    sf_max = max(stim_sf_list);
+    sf_norm = (stim_sf_list - sf_min) / (sf_max - sf_min);   % 0 to 1
+    brightness = 0.1 + 0.9 * sf_norm;                        % avoid very dark points
+
+    % Build RGB colors for each condition
+    colors_sf = zeros(n_cond, 3);
+    for i = 1:n_cond
+        hue = hues(ori_idx_for_cond(i));   % orientation
+        sat = brightness(i);
+        val = 1;              % spatial frequency
+        colors_sf(i, :) = hsv2rgb([hue, sat, val]);
+    end
+
+    %% Visualization 4: Top 3 PCs, color coded by ori (hue) and SF (brightness)
     figure('Color','w'); hold on
     set(gcf,'OuterPosition',[700 350 700 700])
 
@@ -193,11 +230,10 @@ function visual_pop_sim_ori_sf
           [score(end,3) score(1,3)], ...
           '-k', 'LineWidth', 1.2);
 
-    % Scatter each stimulus condition with orientation based color
+    % Scatter each stimulus condition with combined color
     for i = 1:n_cond
-        this_color = cmap(ori_idx_for_cond(i), :);
         scatter3(score(i,1), score(i,2), score(i,3), ...
-            60, this_color, 'filled', 'MarkerEdgeColor','k');
+            60, colors_sf(i,:), 'filled', 'MarkerEdgeColor','k');
     end
 
     xlabel('PC1');
@@ -208,6 +244,8 @@ function visual_pop_sim_ori_sf
     title(sprintf('Population PCA (%.1f%% / %.1f%% / %.1f%%)', ...
         explVar(1), explVar(2), explVar(3)), 'FontSize', 20);
 
+    % Colorbar that shows orientation hues at maximum brightness
+    cmap = hsv2rgb([hues, ones(nOri_color,1), ones(nOri_color,1)]);
     colormap(cmap);
     c = colorbar;
 
