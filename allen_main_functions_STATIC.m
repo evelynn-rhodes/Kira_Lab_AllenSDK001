@@ -5,7 +5,7 @@
 clear; clc; close all
 
 %% -------- Set Experiment Folder ----------
-exp_id = 500964514;   % <-- change for other experiments
+exp_id = 500964514;   % <-- change for other experiments, make sure downloaded folder is in the same directory as code
 exp_dir = fullfile('.', sprintf('exp_%d', exp_id));
 
 stim_csv = fullfile(exp_dir, sprintf('static_gratings_stim_table_%d.csv', exp_id));
@@ -18,9 +18,11 @@ ts   = readtable(ts_csv);
 dff  = readtable(dff_csv);
 
 time_s   = ts.time_s;
+%% First column of df/f traces is the cell IDs while the other columns are the trace (F) over time
 cell_ids = dff{:,1};
 F        = dff{:,2:end};
 
+%%Calculate the base flourescense so that we have a baseline of a cell that's not active
 dt = median(diff(time_s));
 [nCell, T_f] = size(F);
 fprintf('Loaded: %d cells, %d timepoints, dt=%.4f\n', nCell, T_f, dt);
@@ -30,13 +32,26 @@ oris = unique(stim.orientation);
 sfs  = unique(stim.spatial_frequency);
 phs  = unique(stim.phase);
 
-% Expected bins (Allen static gratings)
+% Expected bins to help out (Allen static gratings)
 ori_expected = [0 30 60 90 120 150];
 sf_expected  = [0.02 0.04 0.08 0.16 0.32];
 
 %% -------- Compute Response Tensor Resp(ori,sf,cell) ----------
 nOri = numel(oris); nSF = numel(sfs);
 Resp = nan(nOri,nSF,nCell);
+
+%%This is making later steps easier, we build a 3-D matrix of each cells response to each spatial frequency and each orientation
+% The loop works as follows:
+% 1. Loop through every orientation
+% 2. Loop through every spatial frequency
+% 3. Find all trials matching that stimulus condition
+% 4. For each trial:
+%       - compute baseline fluorescence before stimulus onset
+%       - compute mean fluorescence during stimulus
+%       - subtract baseline from stimulus activity
+%         to measure stimulus-evoked response
+% 5. Average responses across repeated trials
+% 6. Store the result in the response tensor
 
 for io=1:nOri
     for sf=1:nSF
@@ -69,8 +84,13 @@ end
 fprintf('✅ Resp tensor computed: [%d ori × %d sf × %d cells]\n',nOri,nSF,nCell);
 
 %% -------- Reduce to Allen bins (6×5) --------
+
+% First create matrix with expected orientations and spatial frequencies in the allenSDK
+% This 3-D matrix is like the one we just created, but filled with NA data first and has a standard size to help with later plotting/calculations
 Resp_fixed = nan(length(ori_expected), length(sf_expected), nCell);
 
+% Go through and see if there was data for our expected orientations and spatial frequencies. If there was we copy it over to the fixed matrix
+% If there was no data for a combination of stimuli, then it will remain as a NA value.
 for io=1:nOri
     oi = find(ori_expected==oris(io));
     for sf=1:nSF
@@ -118,6 +138,7 @@ end
 %% -------- Build aligned matrix & mean trace --------
 max_len = max(trial_len);
 t_align = (0:max_len-1)*dt;
+%If some trials had a longer length, pad with NA values
 trial_mat = nan(nTrials,max_len);
 for tr=1:nTrials
     y=trial_tr{tr}; trial_mat(tr,1:numel(y))=y;
